@@ -3,9 +3,6 @@
 package mobileqz
 
 import (
-	"appengine"
-	"appengine/memcache"
-	"appengine/urlfetch"
 	"bytes"
 	"encoding/json"
 	"fmt"
@@ -17,6 +14,10 @@ import (
 	"strings"
 	"text/template"
 	"time"
+
+	"appengine"
+	"appengine/memcache"
+	"appengine/urlfetch"
 )
 
 var page *template.Template
@@ -52,14 +53,23 @@ type Dates struct {
 }
 
 type Result struct {
-	Id         int
-	Title      string
-	Permalink  string
-	Summary    string
-	Content    string
-	Byline     Byline
-	Taxonomies Taxonomy
-	Date       Dates
+	Id            int
+	Title         string
+	Permalink     string
+	Summary       string
+	Content       string
+	Byline        Byline
+	Taxonomies    Taxonomy
+	Date          Dates
+	FeaturedImage FeaturedImage
+}
+
+type FeaturedImage struct {
+	Src ImageSources
+}
+
+type ImageSources struct {
+	Mobile string
 }
 
 type Taxonomy struct {
@@ -228,6 +238,11 @@ func articlePage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	art.Content = stripReadThisNext(art.Content)
+
+	// If this is an image-only post, put in the image
+	if art.Content == "" {
+		art.Content = fmt.Sprintf("<img src=\"%v\">", art.FeaturedImage.Src.Mobile)
+	}
 
 	b := &bytes.Buffer{}
 	fmt.Fprintf(b, "<h1> %s </h1>\n", art.Title)
