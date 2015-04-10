@@ -1,5 +1,5 @@
 To develop:
-	~/go_appengine/dev_appserver.py .
+   goapp serve mobile-qz
 
 To deploy:
-	~/go_appengine/appcfg.py --oauth2 update .
+   goapp deploy -oauth -application mobile-qz mobile-qz
