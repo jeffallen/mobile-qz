@@ -168,7 +168,7 @@ func getFromNet(ctx appengine.Context, q string) (*Response, error) {
 	i := &memcache.Item{
 		Key:        q,
 		Object:     &r,
-		Expiration: 300 * time.Second,
+		Expiration: 15 * time.Minute,
 	}
 	memcache.Gob.Set(ctx, i)
 
