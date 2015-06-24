@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
+	"log"
 	"net/http"
 	"regexp"
 	"runtime"
@@ -29,7 +30,7 @@ type Page struct {
 }
 
 type Response struct {
-	Results []Result
+	Items []Item
 	// also available:
 	// Recent
 	// Header
@@ -52,7 +53,7 @@ type Dates struct {
 	Updated   string
 }
 
-type Result struct {
+type Item struct {
 	Id            int
 	Title         string
 	Permalink     string
@@ -82,7 +83,7 @@ type Tag struct {
 	Tag  string
 }
 
-func (r Result) byline() string {
+func (r Item) byline() string {
 	if r.Byline.BylineString != "" {
 		return r.Byline.BylineString
 	}
@@ -94,7 +95,7 @@ func (r Result) byline() string {
 	return strings.Join(lines, ", ")
 }
 
-func (r Result) tags() string {
+func (r Item) tags() string {
 	t := r.Taxonomies.Kicker
 	t = append(t, r.Taxonomies.Tags...)
 
@@ -124,6 +125,7 @@ func init() {
 }
 
 func get(ctx appengine.Context, q string) (*Response, error) {
+	log.Print("get", q)
 	if r, err := getFromCache(ctx, q); err == nil {
 		return r, err
 	}
@@ -156,9 +158,9 @@ func getFromNet(ctx appengine.Context, q string) (*Response, error) {
 	}
 
 	// Fix their content for our purposes.
-	for i := range r.Results {
-		r.Results[i].Title = fixHeadline(r.Results[i].Title)
-		r.Results[i].Content = fixQzLinks(r.Results[i].Content)
+	for i := range r.Items {
+		r.Items[i].Title = fixHeadline(r.Items[i].Title)
+		r.Items[i].Content = fixQzLinks(r.Items[i].Content)
 	}
 
 	// We cache the fixed version so that we don't need to do the fixes
@@ -169,6 +171,16 @@ func getFromNet(ctx appengine.Context, q string) (*Response, error) {
 		Expiration: 15 * time.Minute,
 	}
 	memcache.Gob.Set(ctx, i)
+
+	for _, i := range r.Items {
+		r2 := Response{Items: []Item{i}}
+		i := &memcache.Item{
+			Key:        fmt.Sprintf("single/%v", i.Id),
+			Object:     &r2,
+			Expiration: 300 * time.Second,
+		}
+		memcache.Gob.Set(ctx, i)
+	}
 
 	return &r, nil
 }
@@ -218,8 +230,8 @@ func articlePage(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var art Result
-	for _, r := range q.Results {
+	var art Item
+	for _, r := range q.Items {
 		if r.Id == int(wanted) {
 			art = r
 		}
@@ -277,7 +289,7 @@ func frontPage(w http.ResponseWriter, r *http.Request) {
 
 	b := &bytes.Buffer{}
 	fmt.Fprintf(b, "<dl>")
-	for _, r := range q.Results {
+	for _, r := range q.Items {
 		fmt.Fprintf(b, "<dt><a href=\"/article/%v\">%v</a></dt>\n", r.Id, r.Title)
 		fmt.Fprintf(b, "<dd>%v</dd>\n", r.Summary)
 	}
